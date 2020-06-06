@@ -6,12 +6,11 @@ from gql.transport.requests import RequestsHTTPTransport
 
 team = os.environ.get('KIBELA_TEAM')
 token = os.environ.get('KIBELA_TOKEN')
-folder_id = os.environ.get('FOLDER_ID')
+parent_id = os.environ.get('FOLDER_ID')
 api_endpoint = 'https://{}.kibe.la/api/v1'.format(team)
 
 
-def getPages():
-
+def getPages(target_folder):
     http_transport = RequestsHTTPTransport(
         url=api_endpoint,
         headers={
@@ -27,25 +26,43 @@ def getPages():
     )
 
     query = gql('''
-        query HelloKibela {
-            notes(first: 10, orderBy: { field: CONTENT_UPDATED_AT, direction: DESC }, folderId: "{}") {
+        query getFolders {
+            folders(first: 10, folderId: {}) {
                 edges {
                     node {
-                        title
-                        publishedAt
-                        content
+                        name
+                        id
                     }
                 }
             }
         }
-        '''.format(folder_id)
+        '''.format(parent_id))
 
-    res=client.execute(query)
-    return res
+    folders = client.execute(query).folders.edges
+    for folder in folders:
+        if folder.node.name == target_folder:
+            query = gql('''
+                query HelloKibela {
+                    notes(first: 10, orderBy: { field: CONTENT_UPDATED_AT, direction: DESC }, folderId: {}) {
+                        edges {
+                            node {
+                                title
+                                content
+                            }
+                        }
+                    }
+                }
+                '''.format(folder.node.id))
+
+        res = client.execute(query)
+        return json.dumps(res.notes.edges)
+
+    return "{}"
 
 
 def lambda_handler(event, context):
     return {
         'statusCode': 200,
-        'body': json.dumps(getPages())
+        'headers': {'Access-Control-Allow-Origin': '*'},
+        'body': getPages(event.folder)
     }
