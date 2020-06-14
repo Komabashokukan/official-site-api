@@ -1,4 +1,4 @@
 #!/bin/bash
 
-pip install -r requirement.txt -t .
+pip3 install -r requirements.txt -t .
 zip -r upload.zip .
